@@ -21,3 +21,6 @@ stephanex-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Ignoner WS_Protocol
+WS_Protocol/
