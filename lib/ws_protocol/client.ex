@@ -151,6 +151,20 @@ defmodule WSProtocol.Client do
   end
 
   @doc """
+  Reads a single value with the specified data type.
+
+  The data_type parameter determines whether to read as integer or float.
+  """
+  @spec read_single_value(GenServer.server(), non_neg_integer(), :int | :float) :: {:ok, integer() | float()} | {:error, any()}
+  def read_single_value(client, tag_id, :int) do
+    read_single_value_as_int(client, tag_id)
+  end
+
+  def read_single_value(client, tag_id, :float) do
+    read_single_value_as_float(client, tag_id)
+  end
+
+  @doc """
   Writes a single integer value.
   """
   @spec write_single_value(GenServer.server(), non_neg_integer(), integer()) :: :ok | {:error, any()}
