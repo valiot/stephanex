@@ -56,7 +56,7 @@ defmodule WSProtocol do
           | :implausible_list
           | :alive
 
-  @type data_type :: :integer | :float | :string
+  @type data_type :: :integer | :uint | :float | :string
 
   @type data_access :: :read_only | :write_only | :read_write
 

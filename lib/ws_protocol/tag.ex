@@ -18,6 +18,7 @@ defmodule WSProtocol.Tag do
           data_type: WSProtocol.data_type(),
           string_value: String.t(),
           int_value: integer(),
+          uint_value: non_neg_integer(),
           real_value: float(),
           access: WSProtocol.data_access()
         }
@@ -27,6 +28,7 @@ defmodule WSProtocol.Tag do
             data_type: :integer,
             string_value: "",
             int_value: 0,
+            uint_value: 0,
             real_value: 0.0,
             access: :read_write
 
@@ -52,6 +54,7 @@ defmodule WSProtocol.Tag do
       data_type: data_type,
       string_value: Keyword.get(opts, :string_value, ""),
       int_value: Keyword.get(opts, :int_value, 0),
+      uint_value: Keyword.get(opts, :uint_value, 0),
       real_value: Keyword.get(opts, :real_value, 0.0),
       access: Keyword.get(opts, :access, :read_write)
     }
@@ -70,8 +73,9 @@ defmodule WSProtocol.Tag do
       iex> WSProtocol.Tag.get_value(tag)
       "Hello"
   """
-  @spec get_value(t()) :: integer() | float() | String.t()
+  @spec get_value(t()) :: integer() | non_neg_integer() | float() | String.t()
   def get_value(%__MODULE__{data_type: :integer, int_value: value}), do: value
+  def get_value(%__MODULE__{data_type: :uint, uint_value: value}), do: value
   def get_value(%__MODULE__{data_type: :float, real_value: value}), do: value
   def get_value(%__MODULE__{data_type: :string, string_value: value}), do: value
 
@@ -84,9 +88,13 @@ defmodule WSProtocol.Tag do
       iex> WSProtocol.Tag.set_value(tag, 42)
       %WSProtocol.Tag{data_type: :integer, int_value: 42}
   """
-  @spec set_value(t(), integer() | float() | String.t()) :: t()
+  @spec set_value(t(), integer() | non_neg_integer() | float() | String.t()) :: t()
   def set_value(%__MODULE__{data_type: :integer} = tag, value) when is_integer(value) do
     %{tag | int_value: value}
+  end
+
+  def set_value(%__MODULE__{data_type: :uint} = tag, value) when is_integer(value) and value >= 0 do
+    %{tag | uint_value: value}
   end
 
   def set_value(%__MODULE__{data_type: :float} = tag, value) when is_number(value) do
@@ -122,6 +130,10 @@ defmodule WSProtocol.Tag do
     <<value::little-signed-32>>
   end
 
+  def value_to_binary(%__MODULE__{data_type: :uint, uint_value: value}) do
+    <<value::little-unsigned-32>>
+  end
+
   def value_to_binary(%__MODULE__{data_type: :float, real_value: value}) do
     <<value::little-float-32>>
   end
@@ -139,6 +151,10 @@ defmodule WSProtocol.Tag do
   @spec set_value_from_binary(t(), binary()) :: t()
   def set_value_from_binary(%__MODULE__{data_type: :integer} = tag, <<value::little-signed-32>>) do
     %{tag | int_value: value}
+  end
+
+  def set_value_from_binary(%__MODULE__{data_type: :uint} = tag, <<value::little-unsigned-32>>) do
+    %{tag | uint_value: value}
   end
 
   def set_value_from_binary(%__MODULE__{data_type: :float} = tag, <<value::little-float-32>>) do

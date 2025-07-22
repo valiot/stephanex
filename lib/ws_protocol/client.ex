@@ -23,8 +23,14 @@ defmodule WSProtocol.Client do
       # Read a value
       {:ok, value} = WSProtocol.Client.read_single_value_as_int(client, 1001)
 
+      # Read an unsigned integer value
+      {:ok, uint_value} = WSProtocol.Client.read_single_value_as_uint(client, 1002)
+
       # Write a value
       :ok = WSProtocol.Client.write_single_value(client, 1002, 42)
+
+      # Write an unsigned integer value
+      :ok = WSProtocol.Client.write_single_value_uint(client, 1003, 123)
 
       # Read a string
       {:ok, string} = WSProtocol.Client.read_single_string(client, 2001)
@@ -151,13 +157,25 @@ defmodule WSProtocol.Client do
   end
 
   @doc """
+  Reads a single value as an unsigned integer.
+  """
+  @spec read_single_value_as_uint(GenServer.server(), non_neg_integer()) :: {:ok, non_neg_integer()} | {:error, any()}
+  def read_single_value_as_uint(client, tag_id) do
+    GenServer.call(client, {:read_single_value_as_uint, tag_id})
+  end
+
+  @doc """
   Reads a single value with the specified data type.
 
-  The data_type parameter determines whether to read as integer or float.
+  The data_type parameter determines whether to read as integer, unsigned integer, or float.
   """
-  @spec read_single_value(GenServer.server(), non_neg_integer(), :int | :float) :: {:ok, integer() | float()} | {:error, any()}
+  @spec read_single_value(GenServer.server(), non_neg_integer(), :int | :uint | :float) :: {:ok, integer() | non_neg_integer() | float()} | {:error, any()}
   def read_single_value(client, tag_id, :int) do
     read_single_value_as_int(client, tag_id)
+  end
+
+  def read_single_value(client, tag_id, :uint) do
+    read_single_value_as_uint(client, tag_id)
   end
 
   def read_single_value(client, tag_id, :float) do
@@ -175,6 +193,14 @@ defmodule WSProtocol.Client do
   @spec write_single_value(GenServer.server(), non_neg_integer(), float()) :: :ok | {:error, any()}
   def write_single_value(client, tag_id, value) when is_float(value) do
     GenServer.call(client, {:write_single_value_float, tag_id, value})
+  end
+
+  @doc """
+  Writes a single unsigned integer value.
+  """
+  @spec write_single_value_uint(GenServer.server(), non_neg_integer(), non_neg_integer()) :: :ok | {:error, any()}
+  def write_single_value_uint(client, tag_id, value) when is_integer(value) and value >= 0 do
+    GenServer.call(client, {:write_single_value_uint, tag_id, value})
   end
 
   @doc """
@@ -227,7 +253,12 @@ defmodule WSProtocol.Client do
     {:reply, state.connected, state}
   end
 
-  def handle_call(:no_op, _from, %State{connected: false} = state) do
+  def handle_call(call, _from, %State{connected: false} = state)
+      when call in [:no_op] or
+           (is_tuple(call) and tuple_size(call) >= 2 and
+            elem(call, 0) in [:read_single_value_as_int, :read_single_value_as_float, :read_single_value_as_uint,
+                              :write_single_value_int, :write_single_value_float, :write_single_value_uint,
+                              :read_single_string, :write_single_string]) do
     {:reply, {:error, :not_connected}, state}
   end
 
@@ -236,17 +267,9 @@ defmodule WSProtocol.Client do
     {:reply, result, state}
   end
 
-  def handle_call({:read_single_value_as_int, _tag_id}, _from, %State{connected: false} = state) do
-    {:reply, {:error, :not_connected}, state}
-  end
-
   def handle_call({:read_single_value_as_int, tag_id}, _from, %State{socket: socket} = state) do
     result = ReadSingleValue.execute_as_integer(socket, tag_id)
     {:reply, result, state}
-  end
-
-  def handle_call({:read_single_value_as_float, _tag_id}, _from, %State{connected: false} = state) do
-    {:reply, {:error, :not_connected}, state}
   end
 
   def handle_call({:read_single_value_as_float, tag_id}, _from, %State{socket: socket} = state) do
@@ -254,8 +277,9 @@ defmodule WSProtocol.Client do
     {:reply, result, state}
   end
 
-  def handle_call({:write_single_value_int, _tag_id, _value}, _from, %State{connected: false} = state) do
-    {:reply, {:error, :not_connected}, state}
+  def handle_call({:read_single_value_as_uint, tag_id}, _from, %State{socket: socket} = state) do
+    result = ReadSingleValue.execute_as_uint(socket, tag_id)
+    {:reply, result, state}
   end
 
   def handle_call({:write_single_value_int, tag_id, value}, _from, %State{socket: socket} = state) do
@@ -263,26 +287,19 @@ defmodule WSProtocol.Client do
     {:reply, result, state}
   end
 
-  def handle_call({:write_single_value_float, _tag_id, _value}, _from, %State{connected: false} = state) do
-    {:reply, {:error, :not_connected}, state}
-  end
-
   def handle_call({:write_single_value_float, tag_id, value}, _from, %State{socket: socket} = state) do
     result = WriteSingleValue.execute_float(socket, tag_id, value)
     {:reply, result, state}
   end
 
-  def handle_call({:read_single_string, _tag_id}, _from, %State{connected: false} = state) do
-    {:reply, {:error, :not_connected}, state}
+  def handle_call({:write_single_value_uint, tag_id, value}, _from, %State{socket: socket} = state) do
+    result = WriteSingleValue.execute_uint(socket, tag_id, value)
+    {:reply, result, state}
   end
 
   def handle_call({:read_single_string, tag_id}, _from, %State{socket: socket} = state) do
     result = ReadSingleString.execute(socket, tag_id)
     {:reply, result, state}
-  end
-
-  def handle_call({:write_single_string, _tag_id, _value}, _from, %State{connected: false} = state) do
-    {:reply, {:error, :not_connected}, state}
   end
 
   def handle_call({:write_single_string, tag_id, value}, _from, %State{socket: socket} = state) do

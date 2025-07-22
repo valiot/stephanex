@@ -69,6 +69,17 @@ defmodule WSProtocol.Message.ReadSingleValue do
   end
 
   @doc """
+  Executes a ReadSingleValue command and returns the value as an unsigned integer.
+  """
+  @spec execute_as_uint(:gen_tcp.socket(), non_neg_integer()) :: {:ok, non_neg_integer()} | {:error, any()}
+  def execute_as_uint(socket, tag_id) do
+    case execute(socket, tag_id) do
+      {:ok, <<value::little-unsigned-32>>} -> {:ok, value}
+      error -> error
+    end
+  end
+
+  @doc """
   Handles a ReadSingleValue command on the server side.
   """
   @spec handle_request(:gen_tcp.socket(), non_neg_integer(), binary(), (non_neg_integer() -> Tag.t() | nil)) ::

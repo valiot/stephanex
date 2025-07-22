@@ -64,6 +64,15 @@ defmodule WSProtocol.Message.WriteSingleValue do
   end
 
   @doc """
+  Executes a WriteSingleValue command for the client with an unsigned integer value.
+  """
+  @spec execute_uint(:gen_tcp.socket(), non_neg_integer(), non_neg_integer()) :: :ok | {:error, any()}
+  def execute_uint(socket, tag_id, value) when is_integer(value) and value >= 0 do
+    value_binary = <<value::little-unsigned-32>>
+    execute(socket, tag_id, value_binary)
+  end
+
+  @doc """
   Handles a WriteSingleValue command on the server side.
   """
   @spec handle_request(

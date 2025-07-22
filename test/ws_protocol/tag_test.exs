@@ -33,6 +33,16 @@ defmodule WSProtocol.TagTest do
       assert tag.real_value == 3.14
       assert tag.access == :read_only
     end
+
+    test "creates a new tag with uint values" do
+      tag = Tag.new(1003, "UInt Tag", :uint, uint_value: 4294967295)
+
+      assert tag.tag_id == 1003
+      assert tag.name == "UInt Tag"
+      assert tag.data_type == :uint
+      assert tag.uint_value == 4294967295
+      assert tag.access == :read_write
+    end
   end
 
   describe "get_value/1" do
@@ -49,6 +59,11 @@ defmodule WSProtocol.TagTest do
     test "returns string value for string tag" do
       tag = %Tag{data_type: :string, string_value: "Hello"}
       assert Tag.get_value(tag) == "Hello"
+    end
+
+    test "returns uint value for uint tag" do
+      tag = %Tag{data_type: :uint, uint_value: 4294967295}
+      assert Tag.get_value(tag) == 4294967295
     end
   end
 
@@ -75,6 +90,20 @@ defmodule WSProtocol.TagTest do
       tag = %Tag{data_type: :string, string_value: ""}
       updated_tag = Tag.set_value(tag, "Hello")
       assert updated_tag.string_value == "Hello"
+    end
+
+    test "sets uint value for uint tag" do
+      tag = %Tag{data_type: :uint, uint_value: 0}
+      updated_tag = Tag.set_value(tag, 4294967295)
+      assert updated_tag.uint_value == 4294967295
+    end
+
+    test "rejects negative values for uint tag" do
+      tag = %Tag{data_type: :uint, uint_value: 0}
+
+      assert_raise FunctionClauseError, fn ->
+        Tag.set_value(tag, -1)
+      end
     end
   end
 
@@ -131,6 +160,12 @@ defmodule WSProtocol.TagTest do
       assert binary == <<3.14::little-float-32>>
     end
 
+    test "converts uint value to binary" do
+      tag = %Tag{data_type: :uint, uint_value: 4294967295}
+      binary = Tag.value_to_binary(tag)
+      assert binary == <<4294967295::little-unsigned-32>>
+    end
+
     test "returns zero for string tag" do
       tag = %Tag{data_type: :string, string_value: "Hello"}
       binary = Tag.value_to_binary(tag)
@@ -141,26 +176,37 @@ defmodule WSProtocol.TagTest do
   describe "set_value_from_binary/2" do
     test "sets integer value from binary" do
       tag = %Tag{data_type: :integer, int_value: 0}
-      updated_tag = Tag.set_value_from_binary(tag, <<42::little-signed-32>>)
+      binary = <<42::little-signed-32>>
+      updated_tag = Tag.set_value_from_binary(tag, binary)
       assert updated_tag.int_value == 42
     end
 
     test "sets negative integer value from binary" do
       tag = %Tag{data_type: :integer, int_value: 0}
-      updated_tag = Tag.set_value_from_binary(tag, <<-42::little-signed-32>>)
+      binary = <<-42::little-signed-32>>
+      updated_tag = Tag.set_value_from_binary(tag, binary)
       assert updated_tag.int_value == -42
+    end
+
+    test "sets uint value from binary" do
+      tag = %Tag{data_type: :uint, uint_value: 0}
+      binary = <<4294967295::little-unsigned-32>>
+      updated_tag = Tag.set_value_from_binary(tag, binary)
+      assert updated_tag.uint_value == 4294967295
     end
 
     test "sets float value from binary" do
       tag = %Tag{data_type: :float, real_value: 0.0}
-      updated_tag = Tag.set_value_from_binary(tag, <<3.14::little-float-32>>)
+      binary = <<3.14::little-float-32>>
+      updated_tag = Tag.set_value_from_binary(tag, binary)
       assert_in_delta updated_tag.real_value, 3.14, 0.001
     end
 
-    test "does not modify string tag" do
+    test "leaves string tag unchanged" do
       tag = %Tag{data_type: :string, string_value: "Hello"}
-      updated_tag = Tag.set_value_from_binary(tag, <<42::little-signed-32>>)
-      assert updated_tag.string_value == "Hello"
+      binary = <<42::little-32>>
+      updated_tag = Tag.set_value_from_binary(tag, binary)
+      assert updated_tag == tag
     end
   end
 end

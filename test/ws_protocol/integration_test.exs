@@ -15,12 +15,14 @@ defmodule WSProtocol.IntegrationTest do
     string_tag = Tag.new(1003, "String Tag", :string, string_value: "Hello World")
     read_only_tag = Tag.new(1004, "Read Only Tag", :integer, int_value: 100, access: :read_only)
     write_only_tag = Tag.new(1005, "Write Only Tag", :integer, int_value: 200, access: :write_only)
+    uint_tag = Tag.new(1006, "UInt Tag", :uint, uint_value: 4294967295)
 
     :ok = Server.add_tag(server, integer_tag)
     :ok = Server.add_tag(server, float_tag)
     :ok = Server.add_tag(server, string_tag)
     :ok = Server.add_tag(server, read_only_tag)
     :ok = Server.add_tag(server, write_only_tag)
+    :ok = Server.add_tag(server, uint_tag)
 
     # Start client
     {:ok, client} = Client.start_link(host: "localhost", port: @test_port, heartbeat_enabled: false)
@@ -76,6 +78,40 @@ defmodule WSProtocol.IntegrationTest do
 
     test "client cannot write to read-only tag", %{client: client} do
       assert {:error, :unauthorized_access} = Client.write_single_value(client, 1004, 999)
+    end
+  end
+
+  describe "Read/Write UInt Values" do
+    test "client can read uint value from server", %{client: client} do
+      assert {:ok, 4294967295} = Client.read_single_value_as_uint(client, 1006)
+    end
+
+    test "client can write uint value to server", %{client: client, server: server} do
+      # Write new value
+      assert :ok = Client.write_single_value_uint(client, 1006, 123456789)
+
+      # Verify it was written
+      assert {:ok, 123456789} = Client.read_single_value_as_uint(client, 1006)
+
+      # Verify server state
+      assert {:ok, tag} = Server.get_tag(server, 1006)
+      assert tag.uint_value == 123456789
+    end
+
+    test "client can read uint value with read_single_value", %{client: client} do
+      assert {:ok, 4294967295} = Client.read_single_value(client, 1006, :uint)
+    end
+
+    test "client can write large uint value", %{client: client, server: server} do
+      # Write maximum uint32 value
+      assert :ok = Client.write_single_value_uint(client, 1006, 4294967295)
+
+      # Verify it was written
+      assert {:ok, 4294967295} = Client.read_single_value_as_uint(client, 1006)
+
+      # Verify server state
+      assert {:ok, tag} = Server.get_tag(server, 1006)
+      assert tag.uint_value == 4294967295
     end
   end
 
@@ -214,7 +250,7 @@ defmodule WSProtocol.IntegrationTest do
 
     test "server can list all tags", %{server: server} do
       tags = Server.list_tags(server)
-      assert length(tags) == 5
+      assert length(tags) == 6
 
       tag_ids = Enum.map(tags, & &1.tag_id)
       assert 1001 in tag_ids
@@ -222,6 +258,7 @@ defmodule WSProtocol.IntegrationTest do
       assert 1003 in tag_ids
       assert 1004 in tag_ids
       assert 1005 in tag_ids
+      assert 1006 in tag_ids
     end
   end
 end
